@@ -1,42 +1,382 @@
-async function generateQuestions(subjectKey, level, count) {
-    // このURLをあなたのCloud FunctionのURLに書き換えてください
-    const cloudFunctionUrl = https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions;
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新しい学習指導要領の考え方 - AI学習診断クイズ(発展学習サイクル版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans JP', 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+        .subject-btn { transition: all 0.3s ease; }
+        .subject-btn:hover { transform: scale(1.05); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1); }
+        .quiz-option { cursor: pointer; transition: all 0.2s ease-in-out; }
+        .quiz-option.answered:not(.correct):not(.incorrect) { opacity: 0.6; cursor: not-allowed; }
+        .correct { background-color: #dcfce7 !important; border-color: #4ade80 !important; }
+        .incorrect { background-color: #fee2e2 !important; border-color: #f87171 !important; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="gradient-bg text-gray-800">
 
-    const payload = {
-        subjectKey: subjectKey,
-        level: level,
-        count: count
-    };
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl">
+        
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">新しい学習指導要領の考え方</h1>
+            <p class="mt-2 text-lg text-gray-600">AI学習診断クイズで「見方・考え方」をマスターしよう</p>
+        </header>
 
-    try {
-        const response = await fetch(cloudFunctionUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
+        <main id="main-content">
+            <div id="initial-sections">
+                <section class="mb-12"><h2 class="text-2xl font-bold mb-4 border-l-4 border-blue-500 pl-4">1. なぜ今、学習指導要領が改訂されたのか？</h2><div class="bg-white p-6 rounded-xl shadow-md"><p>社会の変化は加速度を増し、予測が困難な時代になっています。このような時代を生きる子どもたちには、未知の状況にも対応できる「生きる力」が求められます。</p></div></section>
+                <section class="mb-12"><h2 class="text-2xl font-bold mb-4 border-l-4 border-green-500 pl-4">2. 育成を目指す資質・能力の三つの柱</h2><div class="grid md:grid-cols-3 gap-6"><div class="bg-white p-6 rounded-xl shadow-md flex flex-col"><h3 class="text-xl font-bold text-green-800 mb-2">① 知識・技能</h3></div><div class="bg-white p-6 rounded-xl shadow-md flex flex-col"><h3 class="text-xl font-bold text-green-800 mb-2">② 思考力・判断力・表現力等</h3></div><div class="bg-white p-6 rounded-xl shadow-md flex flex-col"><h3 class="text-xl font-bold text-green-800 mb-2">③ 学びに向かう力、人間性等</h3></div></div></section>
+                <section class="mb-12"><h2 class="text-2xl font-bold mb-4 border-l-4 border-purple-500 pl-4">3. 「主体的・対話的で深い学び」の実践</h2><div class="bg-white p-6 rounded-xl shadow-md"><p>三つの柱をバランスよく育むため、授業改善の視点として「主体的・対話的で深い学び」（アクティブ・ラーニング）が重要となります。</p></div></section>
+                <section id="quiz-section" class="mb-12"><h2 class="text-2xl font-bold mb-4 border-l-4 border-red-500 pl-4">4. 「見方・考え方」クイズ</h2><div id="subject-selection" class="bg-white p-6 rounded-xl shadow-lg"><h3 class="text-xl font-bold text-center mb-6">挑戦する教科を選んでください</h3><div id="subject-buttons" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div></div></section>
+            </div>
+            <div id="quiz-display-area" class="hidden"></div>
+        </main>
 
-        if (!response.ok) {
-            // サーバーからのエラーメッセージを取得しようと試みる
-            let errorText = `Cloud Function request failed with status ${response.status}`;
+        <footer class="text-center mt-12 pt-6 border-t border-gray-300">
+            <p class="text-gray-600">このページは以下の資料を基に作成されました。<br><a href="https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/02/04/1399950_4.pdf" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">文部科学省: 新しい学習指導要領の考え方 (PDF)</a></p>
+        </footer>
+    </div>
+    
+    <div id="hint-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center animate-fade-in">
+            <h3 class="text-lg font-bold text-yellow-500">ヒント</h3>
+            <p id="hint-text" class="mt-4 mb-6"></p>
+            <button onclick="closeHint()" class="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg">閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        const quizData = {
+            "seikatsu": { title: "生活", color: "fuchsia", categories: ["探究", "協働", "自己調整"], advice: { "探究": "身の回りの人・もの・ことに関わる体験活動を重視し、「なぜ？」「どうして？」という子どもの問いを大切にしましょう。", "協働": "友達や地域の人々と関わる中で、自分の役割を見つけたり、相手の気持ちを考えたりする場面を設定しましょう。", "自己調整": "活動の計画や振り返りを通して、子ども自身が「次はこうしたい」という見通しを持てるように支援しましょう。" } },
+            "kokugo": { title: "国語", color: "sky", categories: ["言葉の役割", "情報の整理", "多様な視点"], advice: { "言葉の役割": "文章中の言葉が持つ意味や効果に着目し、「なぜこの表現なのか」を考える習慣をつけましょう。", "情報の整理": "文章の構成や論理の展開を意識し、要点や根拠を的確に捉える練習が効果的です。", "多様な視点": "登場人物の立場や、筆者の意図などを多角的に捉え、自分の考えと比較・検討することが大切です。" } },
+            "shakai": { title: "社会", color: "emerald", categories: ["時間的見方", "空間的見方", "社会的見方"], advice: { "時間的見方": "物事の「変化」や「継続」に着目し、歴史的な背景や未来への影響を考えましょう。", "空間的見方": "物事の「場所」や「分布」、「人の動き」などに着目し、地域性や他地域との関係性を考えましょう。", "社会的見方": "社会の「仕組み」や「ルール」、「人々の合意形成」などに着目し、社会的な課題の解決策を考えましょう。" } },
+            "sansuu": { title: "算数・数学", color: "amber", categories: ["数量・図形", "論理的思考", "関係性の探究"], advice: { "数量・図形": "日常の事象を数や量、形として捉え、その性質や関係を見出す練習をしましょう。", "論理的思考": "「なぜそう言えるのか」という根拠を常に考え、筋道を立てて説明する習慣が大切です。", "関係性の探究": "伴って変わる二つの数量の関係（関数）や、データ間の傾向など、物事のつながりに着目しましょう。" } },
+            "rika": { title: "理科", color: "lime", categories: ["エネルギー・粒子", "生命・地球", "科学的探究"], advice: { "エネルギー・粒子": "目に見えないエネルギーの流れや粒子の振る舞いをモデル化して考える視点を養いましょう。", "生命・地球": "生物の多様性や共通性、地球環境の相互作用といった大きなスケールで物事を捉えることが重要です。", "科学的探究": "対照実験の計画や、得られたデータから結論を導く論理的なプロセスを重視した指導を心がけましょう。" } },
+            "ongaku": { title: "音楽", color: "violet", categories: ["構成要素", "文化的背景", "創造的表現"], advice: { "構成要素": "リズムや旋律といった要素が、楽曲全体のイメージをどう作っているか、要素を分解・統合して聴き取る活動を取り入れましょう。", "文化的背景": "楽曲が作られた時代や地域の文化と、音楽の様式との関わりを探究する学びが有効です。", "創造的表現": "自分のイメージを音楽で表現するために、音楽のどの要素をどう工夫するかを考えさせる場面を設定しましょう。" } },
+            "bijutsu": { title: "図画工作・美術", color: "orange", categories: ["造形要素", "発想・構想", "鑑賞"], advice: { "造形要素": "形や色彩が与える印象について、言葉で説明したり比較したりする活動が効果的です。", "発想・構想": "テーマから発想を広げる際に、マインドマップを使ったり、様々な資料からヒントを得たりする方法を指導しましょう。", "鑑賞": "作品の良さや作者の意図について、自分なりの根拠を持って語り合う対話的な鑑賞活動を取り入れましょう。" } },
+            "taiiku": { title: "保健体育", color: "rose", categories: ["技能と戦術", "健康と安全", "スポーツの価値"], advice: { "技能と戦術": "自分の動きを映像で確認し、課題を見つける活動や、チームで作戦を立てる活動が有効です。", "健康と安全": "健康に関する科学的根拠に基づいた情報を取捨選択し、意思決定を行う学習を重視しましょう。", "スポーツの価値": "スポーツが文化としてどう発展してきたか、また、フェアプレー精神の重要性について考える機会を設定しましょう。" } },
+            "gaikokugo": { title: "外国語", color: "teal", categories: ["言語理解", "文化理解", "コミュニケーション"], advice: { "言語理解": "音声と文字の関係や、文の仕組みに気づかせる活動を通して、既習の知識を活用する力を育てましょう。", "文化理解": "言語の背景にある文化的な違いや共通点を知り、多様性を尊重する態度を育むことが大切です。", "コミュニケーション": "間違いを恐れず、ジェスチャーなども活用しながら、積極的に伝え合おうとする意欲を評価しましょう。" } },
+            "gika": { title: "技術・家庭", color: "cyan", categories: ["設計・製作", "情報活用", "生活の工夫"], advice: { "設計・製作": "課題解決のために、複数の選択肢を比較検討し、最適な計画を立てるプロセスを重視しましょう。", "情報活用": "情報の信憑性を評価し、倫理観を持って情報を活用する態度を育成することが不可欠です。", "生活の工夫": "持続可能な社会を意識し、環境負荷や長期的な視点から生活を見直す活動を取り入れましょう。" } },
+            "doutoku": { title: "道徳", color: "indigo", categories: ["自己との関わり", "他者との関わり", "集団や社会との関わり"], advice: { "自己との関わり": "自分の弱さや未熟さと向き合い、どうすればよりよく生きられるかを考える内省的な時間を確保しましょう。", "他者との関わり": "多様な考え方に触れ、対話を通して自分の考えを広げたり深めたりする「考える道徳、議論する道徳」を実践しましょう。", "集団や社会との関わり": "よりよい社会の実現のために、自分に何ができるかを考え、実践しようとする態度を育てることが重要です。" } },
+            "sougou": { title: "総合的な学習の時間", color: "slate", categories: ["課題設定", "情報収集・整理", "まとめ・表現"], advice: { "課題設定": "生徒が自ら問いを見いだせるよう、実社会との接点となる体験活動や、多様な情報に触れる機会を意図的に設定しましょう。", "情報収集・整理": "探究課題に応じて、インタビュー、観察、文献調査など、適切な情報収集の方法を選択・実行する力を育てましょう。", "まとめ・表現": "探究の成果が他者に効果的に伝わるよう、発表の目的に応じた表現方法を工夫させる指導が大切です。" } },
+            "tokkatsu": { title: "特別活動", color: "pink", categories: ["合意形成", "自己実現", "人間関係形成"], advice: { "合意形成": "学級会などで、意見が対立した際に、互いの主張の根拠を尊重しながら、よりよい解決策を見いだすプロセスを経験させましょう。", "自己実現": "係活動や委員会活動で、自分の得意なことや興味を活かして、集団に貢献する喜びを味わわせましょう。", "人間関係形成": "異学年交流などを通して、自分とは異なる立場や年齢の人と円滑な人間関係を築く力を育てましょう。" } },
+        };
+
+        let state = { currentSubject: null, currentPhase: 'selection', currentQuestionIndex: 0, userAnswers: [], questionSet: [], generatedQuestions: { basic: [], advanced: [] } };
+        const initialSectionsDiv = document.getElementById('initial-sections');
+        const quizDisplayAreaDiv = document.getElementById('quiz-display-area');
+        const subjectButtonsDiv = document.getElementById('subject-buttons');
+        const hintModal = document.getElementById('hint-modal');
+        const hintText = document.getElementById('hint-text');
+
+        // この関数は、前のステップで修正したものです
+        async function generateQuestions(subjectKey, level, count) {
+            // このURLをあなたのCloud FunctionのURLに書き換えてください
+            const cloudFunctionUrl = 'https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions';
+
+            const payload = {
+                subjectKey: subjectKey,
+                level: level,
+                count: count
+            };
+
             try {
-                const errorData = await response.json();
-                errorText += `: ${errorData.message || 'No additional error message.'}`;
-            } catch (e) {
-                // JSONでのパースに失敗した場合
-                errorText += `: ${await response.text()}`;
+                const response = await fetch(cloudFunctionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let errorText = `Cloud Function request failed with status ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorText += `: ${errorData.message || 'No additional error message.'}`;
+                    } catch (e) {
+                        errorText += `: ${await response.text()}`;
+                    }
+                    throw new Error(errorText);
+                }
+                
+                return response.json();
+
+            } catch (error) {
+                console.error("Error calling Cloud Function:", error);
+                quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">問題の生成に失敗しました。</p><p class="text-sm text-gray-600 mt-2">サーバーとの通信中に問題が発生した可能性があります。時間をおいて再度お試しください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
+                throw error;
             }
-            throw new Error(errorText);
+        }
+
+
+        function init() {
+            subjectButtonsDiv.innerHTML = '';
+            Object.keys(quizData).forEach(key => {
+                const subject = quizData[key];
+                const button = document.createElement('button');
+                button.textContent = subject.title;
+                button.className = `subject-btn w-full text-white font-bold py-3 px-4 text-sm rounded-lg shadow-md bg-${subject.color}-500 hover:bg-${subject.color}-600`;
+                button.onclick = () => prepareQuiz(key);
+                subjectButtonsDiv.appendChild(button);
+            });
         }
         
-        return response.json();
+        async function prepareQuiz(subjectKey) {
+            state.currentSubject = subjectKey;
+            initialSectionsDiv.classList.add('hidden');
+            quizDisplayAreaDiv.classList.remove('hidden');
+            quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><div class="loader mx-auto"></div><p class="mt-4 font-semibold text-gray-700">AIがあなた専用の問題を生成中です...</p><p class="text-sm text-gray-500">これには少し時間がかかる場合があります。</p></div>`;
+            quizDisplayAreaDiv.scrollIntoView({ behavior: 'smooth' });
 
-    } catch (error) {
-        console.error("Error calling Cloud Function:", error);
-        // ユーザーに表示するエラーメッセージをより具体的にする
-        quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">問題の生成に失敗しました。</p><p class="text-sm text-gray-600 mt-2">サーバーとの通信中に問題が発生した可能性があります。時間をおいて再度お試しください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
-        // エラーを再スローして、呼び出し元の処理を中断させる
-        throw error;
-    }
-}
+            try {
+                const [basicQuestions, advancedQuestions] = await Promise.all([
+                    generateQuestions(subjectKey, 'basic', 10),
+                    generateQuestions(subjectKey, 'advanced', 10)
+                ]);
+                state.generatedQuestions.basic = basicQuestions;
+                state.generatedQuestions.advanced = advancedQuestions;
+                startQuiz(subjectKey, 'basic');
+            } catch (error) {
+                // エラー表示はgenerateQuestions関数内で行われる
+            }
+        }
+
+        function startQuiz(subjectKey, phase) {
+            state.currentSubject = subjectKey;
+            state.currentPhase = phase;
+            state.currentQuestionIndex = 0;
+            
+            if (phase === 'basic') {
+                state.questionSet = state.generatedQuestions.basic.map((q, i) => i);
+                state.userAnswers = new Array(state.questionSet.length).fill(null);
+            } else if (phase === 'rechallenge') {
+                state.questionSet = state.userAnswers.map((ans, i) => (ans && !ans.isCorrect) ? i : -1).filter(i => i !== -1);
+            } else if (phase === 'advanced') {
+                state.questionSet = state.generatedQuestions.advanced.map((q, i) => i);
+                state.advancedAnswers = new Array(state.questionSet.length).fill(null);
+            }
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const subject = quizData[state.currentSubject];
+            const phase = state.currentPhase;
+            let questionPool = (phase === 'basic' || phase === 'rechallenge') ? state.generatedQuestions.basic : state.generatedQuestions.advanced;
+            
+            const questionIndex = state.questionSet[state.currentQuestionIndex];
+            const questionData = { ...questionPool[questionIndex] };
+            
+            const correctAnswerText = questionData.o[questionData.a];
+            const shuffledOptions = [...questionData.o].sort(() => Math.random() - 0.5);
+            const newCorrectAnswerIndex = shuffledOptions.findIndex(opt => opt === correctAnswerText);
+            questionData.o = shuffledOptions;
+            
+            const optionsHtml = questionData.o.map((option, i) => `<div class="quiz-option border-2 border-gray-200 rounded-lg p-4 mt-3 hover:bg-gray-100" onclick="selectAnswer(this, ${i}, ${newCorrectAnswerIndex})">${option}</div>`).join('');
+            
+            let phaseTitle = "基礎問題";
+            if (phase === 'rechallenge') phaseTitle = "再挑戦問題";
+            if (phase === 'advanced') phaseTitle = "発展問題";
+
+            quizDisplayAreaDiv.innerHTML = `
+                <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg animate-fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-${subject.color}-600">${subject.title}</h3>
+                        <span class="text-sm font-semibold text-gray-500">${phaseTitle} ${state.currentQuestionIndex + 1} / ${state.questionSet.length}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4"><div class="bg-${subject.color}-500 h-2.5 rounded-full" style="width: ${((state.currentQuestionIndex) / state.questionSet.length) * 100}%"></div></div>
+                    <p class="mt-4 mb-5 text-lg leading-relaxed">${questionData.q}</p>
+                    <div id="options-container">${optionsHtml}</div>
+                    <div class="text-center mt-4"><button id="hint-btn" class="text-sm text-yellow-600 font-semibold hover:underline" onclick="showHint()">ヒントを見る</button></div>
+                    <div id="feedback-container" class="mt-4"></div>
+                    <div id="action-buttons" class="mt-6 hidden"><button id="next-btn" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-lg" onclick="nextStep()">次へ</button></div>
+                </div>`;
+        }
+        
+        function selectAnswer(element, selectedIndex, correctIndex) {
+            const subject = quizData[state.currentSubject];
+            const phase = state.currentPhase;
+            let questionPool = (phase === 'basic' || phase === 'rechallenge') ? state.generatedQuestions.basic : state.generatedQuestions.advanced;
+            const originalQuestionIndex = state.questionSet[state.currentQuestionIndex];
+            const questionData = questionPool[originalQuestionIndex];
+
+            const isCorrect = selectedIndex === correctIndex;
+            
+            if (phase === 'basic') {
+                state.userAnswers[originalQuestionIndex] = { answer: selectedIndex, isCorrect: isCorrect, category: questionData.c };
+            } else if (phase === 'rechallenge') {
+                state.userAnswers[originalQuestionIndex].isCorrect = isCorrect;
+            } else if (phase === 'advanced') {
+                state.advancedAnswers[state.currentQuestionIndex] = { answer: selectedIndex, isCorrect: isCorrect, category: questionData.c };
+            }
+
+            const optionsContainer = document.getElementById('options-container');
+            Array.from(optionsContainer.children).forEach((opt, i) => {
+                opt.classList.add('answered');
+                opt.onclick = null;
+                if (i === correctIndex) opt.classList.add('correct');
+            });
+            if (!isCorrect) element.classList.add('incorrect');
+
+            document.getElementById('feedback-container').innerHTML = `<div class="p-4 rounded-lg ${isCorrect ? 'bg-green-100' : 'bg-red-100'} animate-fade-in"><strong class="text-lg ${isCorrect ? 'text-green-700' : 'text-red-700'}">${isCorrect ? '正解！' : '不正解...'}</strong><p class="mt-2">${questionData.ex}</p></div>`;
+            document.getElementById('hint-btn').classList.add('hidden');
+            document.getElementById('action-buttons').classList.remove('hidden');
+            quizDisplayAreaDiv.querySelector('.bg-gray-200 > div').style.width = `${((state.currentQuestionIndex + 1) / state.questionSet.length) * 100}%`;
+        }
+        
+        function showHint() {
+            const subject = quizData[state.currentSubject];
+            const phase = state.currentPhase;
+            let questionPool = (phase === 'basic' || phase === 'rechallenge') ? state.generatedQuestions.basic : state.generatedQuestions.advanced;
+            const questionIndex = state.questionSet[state.currentQuestionIndex];
+            const questionData = questionPool[questionIndex];
+            hintText.textContent = questionData.hint;
+            hintModal.classList.remove('hidden');
+        }
+
+        function closeHint() { hintModal.classList.add('hidden'); }
+
+        function nextStep() {
+            if (state.currentQuestionIndex < state.questionSet.length - 1) {
+                state.currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                if (state.currentPhase === 'advanced') {
+                    showResults('advanced');
+                } else {
+                    showResults('basic');
+                }
+            }
+        }
+        
+        function showResults(phase) {
+            state.currentPhase = 'results';
+            const subject = quizData[state.currentSubject];
+            const answers = (phase === 'basic') ? state.userAnswers : state.advancedAnswers;
+            const questions = (phase === 'basic') ? state.generatedQuestions.basic : state.generatedQuestions.advanced;
+
+            const results = { total: questions.length, correct: 0, byCategory: {} };
+            subject.categories.forEach(c => { results.byCategory[c] = { total: 0, correct: 0 }; });
+
+            answers.forEach((ans, i) => {
+                if (ans) {
+                    const category = questions[i].c;
+                    if (!results.byCategory[category]) {
+                        results.byCategory[category] = { total: 0, correct: 0 };
+                    }
+                    results.byCategory[category].total++;
+                    if (ans.isCorrect) {
+                        results.correct++;
+                        results.byCategory[category].correct++;
+                    }
+                }
+            });
+            
+            const score = results.total > 0 ? (results.correct / results.total) * 100 : 0;
+            
+            let strongestCategory = null;
+            let weakestCategory = null;
+            let maxScore = -1;
+            let minScore = 101;
+
+            Object.keys(results.byCategory).forEach(cat => {
+                const catData = results.byCategory[cat];
+                if (catData.total > 0) {
+                    const catScore = (catData.correct / catData.total) * 100;
+                    if (catScore > maxScore) { maxScore = catScore; strongestCategory = cat; }
+                    if (catScore < minScore) { minScore = catScore; weakestCategory = cat; }
+                }
+            });
+            
+            const analysisHtml = `
+                <div class="space-y-4 mt-6 text-left">
+                    <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-green-800">あなたの強み</h4>
+                        <p class="mt-1 text-gray-700">「<strong>${strongestCategory || '---'}</strong>」の観点について、優れた理解を示しています。この強みを活かし、日々の授業で子どもたちの思考を深める発問を工夫してみましょう。</p>
+                    </div>
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-red-800">今後の課題</h4>
+                        <p class="mt-1 text-gray-700">「<strong>${weakestCategory || '---'}</strong>」の観点に課題が見られます。この観点についての理解を深めることが、指導力向上の鍵となります。</p>
+                    </div>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-blue-800">次の一歩</h4>
+                        <p class="mt-1 text-gray-700">${subject.advice[weakestCategory] || '全体的にバランス良く理解できています。素晴らしいです！'}</p>
+                    </div>
+                </div>
+            `;
+            
+            let actionButtonsHtml = '';
+            if (phase === 'basic') {
+                const canAdvance = score >= 70 && state.generatedQuestions.advanced && state.generatedQuestions.advanced.length > 0;
+                const hasIncorrect = results.correct < results.total;
+                actionButtonsHtml = `
+                    ${hasIncorrect ? `<button class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg" onclick="startQuiz(state.currentSubject, 'rechallenge')">不正解の問題に再挑戦する</button>` : ''}
+                    <button class="w-full ${canAdvance ? `bg-${subject.color}-500 hover:bg-${subject.color}-600` : 'bg-gray-400 cursor-not-allowed'} text-white font-bold py-3 px-6 rounded-lg" ${!canAdvance ? 'disabled' : ''} onclick="startQuiz(state.currentSubject, 'advanced')">発展問題に挑戦する</button>
+                    ${!canAdvance ? `<p class="text-center text-xs text-gray-500">※正答率70%以上で発展問題に挑戦できます。</p>` : ''}
+                `;
+            }
+
+            quizDisplayAreaDiv.innerHTML = `
+                <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg animate-fade-in">
+                    <h3 class="text-2xl font-bold text-center">${phase === 'basic' ? '基礎問題の分析結果' : '発展問題の分析結果'}</h3>
+                    <p class="text-center text-gray-600 mt-2">${subject.title}</p>
+                    <div class="my-8 text-center"><p class="text-lg">正答率</p><p class="text-6xl font-bold ${score >= 70 ? 'text-green-500' : 'text-red-500'}">${score.toFixed(0)}<span class="text-2xl">%</span></p><p class="text-gray-500">(${results.total}問中 ${results.correct}問正解)</p></div>
+                    <div class="mb-8"><h4 class="font-bold text-center mb-4">観点別スコア</h4><canvas id="result-chart"></canvas></div>
+                    ${analysisHtml}
+                    <div class="mt-8 flex flex-col gap-4">
+                        ${actionButtonsHtml}
+                        <button class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg" onclick="prepareQuiz(state.currentSubject)">もう一度新しい問題で挑戦する</button>
+                        <button class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg" onclick="goHome()">他の教科を選ぶ</button>
+                    </div>
+                </div>`;
+            renderChart(subject, results.byCategory);
+        }
+
+        function renderChart(subject, categoryData) {
+            const ctx = document.getElementById('result-chart').getContext('2d');
+            new Chart(ctx, { type: 'radar', data: { labels: subject.categories, datasets: [{ label: '理解度 (%)', data: subject.categories.map(label => { const cat = categoryData[label]; return cat.total > 0 ? (cat.correct / cat.total) * 100 : 0; }), backgroundColor: `rgba(${hexToRgb(getTailwindColor(subject.color))}, 0.2)`, borderColor: `rgba(${hexToRgb(getTailwindColor(subject.color))}, 1)`, borderWidth: 2 }] }, options: { scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 25 }, pointLabels: { font: { size: 14 } } } }, plugins: { legend: { display: false }, tooltip: { enabled: true } } } });
+        }
+        
+        function goHome() {
+            state.currentSubject = null;
+            state.currentPhase = 'selection';
+            quizDisplayAreaDiv.classList.add('hidden');
+            initialSectionsDiv.classList.remove('hidden');
+            window.scrollTo({ top: document.getElementById('quiz-section').offsetTop, behavior: 'smooth' });
+        }
+        
+        function getTailwindColor(colorName) {
+            const colors = { sky: '#0ea5e9', fuchsia: '#d946ef', emerald: '#10b981', amber: '#f59e0b', lime: '#84cc16', violet: '#8b5cf6', orange: '#f97316', rose: '#f43f5e', teal: '#14b8a6', cyan: '#06b6d4', indigo: '#6366f1', slate: '#64748b', pink: '#ec4899' };
+            return colors[colorName] || '#6b7280';
+        }
+        function hexToRgb(hex) {
+            let r = 0, g = 0, b = 0;
+            if (hex.length == 7) { r = "0x" + hex[1] + hex[2]; g = "0x" + hex[3] + hex[4]; b = "0x" + hex[5] + hex[6]; }
+            return `${+r},${+g},${+b}`;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
