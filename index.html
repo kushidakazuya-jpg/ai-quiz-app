@@ -1,0 +1,42 @@
+async function generateQuestions(subjectKey, level, count) {
+    // このURLをあなたのCloud FunctionのURLに書き換えてください
+    const cloudFunctionUrl = https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions;
+
+    const payload = {
+        subjectKey: subjectKey,
+        level: level,
+        count: count
+    };
+
+    try {
+        const response = await fetch(cloudFunctionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            // サーバーからのエラーメッセージを取得しようと試みる
+            let errorText = `Cloud Function request failed with status ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorText += `: ${errorData.message || 'No additional error message.'}`;
+            } catch (e) {
+                // JSONでのパースに失敗した場合
+                errorText += `: ${await response.text()}`;
+            }
+            throw new Error(errorText);
+        }
+        
+        return response.json();
+
+    } catch (error) {
+        console.error("Error calling Cloud Function:", error);
+        // ユーザーに表示するエラーメッセージをより具体的にする
+        quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">問題の生成に失敗しました。</p><p class="text-sm text-gray-600 mt-2">サーバーとの通信中に問題が発生した可能性があります。時間をおいて再度お試しください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
+        // エラーを再スローして、呼び出し元の処理を中断させる
+        throw error;
+    }
+}
