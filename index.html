@@ -91,15 +91,8 @@
         const hintText = document.getElementById('hint-text');
 
         async function generateQuestions(subjectKey, level, count) {
-            // ==================================================================
-            // ★★★★★【重要】このURLをあなたのURLに書き換えてください★★★★★
-            // ==================================================================
-            const cloudFunctionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE'; 
-
-            // もしURLを忘れた場合は、Google Cloud SDK Shellで以下のコマンドを実行して確認してください
-            // gcloud functions describe generateQuizQuestions --gen2 --region=asia-northeast1
-
-            if (cloudFunctionUrl === 'YOUR_CLOUD_FUNCTION_URL_HERE') {
+            const cloudFunctionUrl = 'https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions'; 
+            if (cloudFunctionUrl === 'https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions') {
                 quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">設定エラー</p><p class="text-sm text-gray-600 mt-2">HTMLファイル内のCloud FunctionのURLが設定されていません。コードを編集してください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
                 throw new Error("Cloud Function URL is not set.");
             }
