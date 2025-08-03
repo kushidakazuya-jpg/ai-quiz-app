@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新しい学習指導要領の考え方 - AI学習診断クイズ(発展学習サイクル版)</title>
+    <title>新しい学習指導要領の考え方 - AI学習診断クイズ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -91,44 +91,32 @@
         const hintText = document.getElementById('hint-text');
 
         async function generateQuestions(subjectKey, level, count) {
+            // ==================================================================
+            // ★★★★★【重要】このURLをあなたのURLに書き換えてください★★★★★
+            // ==================================================================
+            const cloudFunctionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE'; 
 
-            const cloudFunctionUrl = 'https://asia-northeast1-gen-lang-client-0728600726.cloudfunctions.net/generateQuizQuestions';
+            if (cloudFunctionUrl === 'YOUR_CLOUD_FUNCTION_URL_HERE') {
+                quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">設定エラー</p><p class="text-sm text-gray-600 mt-2">HTMLファイル内のCloud FunctionのURLが設定されていません。コードを編集してください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
+                throw new Error("Cloud Function URL is not set.");
+            }
 
-            const payload = {
-                subjectKey: subjectKey,
-                level: level,
-                count: count
-            };
+            const payload = { subjectKey, level, count };
 
             try {
                 const response = await fetch(cloudFunctionUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-
-                if (!response.ok) {
-                    let errorText = `Cloud Function request failed with status ${response.status}`;
-                    try {
-                        const errorData = await response.json();
-                        errorText += `: ${errorData.message || 'No additional error message.'}`;
-                    } catch (e) {
-                        errorText += `: ${await response.text()}`;
-                    }
-                    throw new Error(errorText);
-                }
-                
+                if (!response.ok) { throw new Error(`Server responded with ${response.status}`); }
                 return response.json();
-
             } catch (error) {
                 console.error("Error calling Cloud Function:", error);
                 quizDisplayAreaDiv.innerHTML = `<div class="bg-white p-8 rounded-xl shadow-lg text-center"><p class="text-red-500 font-bold">問題の生成に失敗しました。</p><p class="text-sm text-gray-600 mt-2">サーバーとの通信中に問題が発生した可能性があります。時間をおいて再度お試しください。</p><button class="mt-4 bg-gray-700 text-white font-bold py-2 px-6 rounded-lg" onclick="goHome()">ホームに戻る</button></div>`;
                 throw error;
             }
         }
-
 
         function init() {
             subjectButtonsDiv.innerHTML = '';
@@ -157,9 +145,7 @@
                 state.generatedQuestions.basic = basicQuestions;
                 state.generatedQuestions.advanced = advancedQuestions;
                 startQuiz(subjectKey, 'basic');
-            } catch (error) {
-                // エラー表示はgenerateQuestions関数内で行われる
-            }
+            } catch (error) { /* Error is handled in generateQuestions */ }
         }
 
         function startQuiz(subjectKey, phase) {
@@ -201,10 +187,13 @@
             quizDisplayAreaDiv.innerHTML = `
                 <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg animate-fade-in">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-bold text-${subject.color}-600">${subject.title}</h3>
-                        <span class="text-sm font-semibold text-gray-500">${phaseTitle} ${state.currentQuestionIndex + 1} / ${state.questionSet.length}</span>
+                        <h3 class="text-xl font-bold text-${subject.color}-600">${subject.title} - ${phaseTitle}</h3>
+                        <!-- ★★★★★ ここにボタンを追加しました ★★★★★ -->
+                        <button onclick="goHome()" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1 px-3 rounded-lg">トップに戻る</button>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4"><div class="bg-${subject.color}-500 h-2.5 rounded-full" style="width: ${((state.currentQuestionIndex) / state.questionSet.length) * 100}%"></div></div>
+                    <div class="flex justify-end items-center -mt-2 mb-4">
+                        <span class="text-sm font-semibold text-gray-500">問題 ${state.currentQuestionIndex + 1} / ${state.questionSet.length}</span>
+                    </div>
                     <p class="mt-4 mb-5 text-lg leading-relaxed">${questionData.q}</p>
                     <div id="options-container">${optionsHtml}</div>
                     <div class="text-center mt-4"><button id="hint-btn" class="text-sm text-yellow-600 font-semibold hover:underline" onclick="showHint()">ヒントを見る</button></div>
@@ -272,7 +261,7 @@
         function showResults(phase) {
             state.currentPhase = 'results';
             const subject = quizData[state.currentSubject];
-            const answers = (phase === 'basic') ? state.userAnswers : state.advancedAnswers;
+            const answers = (phase === 'basic' || phase === 'rechallenge') ? state.userAnswers : state.advancedAnswers;
             const questions = (phase === 'basic') ? state.generatedQuestions.basic : state.generatedQuestions.advanced;
 
             const results = { total: questions.length, correct: 0, byCategory: {} };
@@ -280,14 +269,16 @@
 
             answers.forEach((ans, i) => {
                 if (ans) {
-                    const category = questions[i].c;
-                    if (!results.byCategory[category]) {
+                    const category = questions[i]?.c;
+                    if (category && !results.byCategory[category]) {
                         results.byCategory[category] = { total: 0, correct: 0 };
                     }
-                    results.byCategory[category].total++;
-                    if (ans.isCorrect) {
-                        results.correct++;
-                        results.byCategory[category].correct++;
+                    if(category) {
+                        results.byCategory[category].total++;
+                        if (ans.isCorrect) {
+                            results.correct++;
+                            results.byCategory[category].correct++;
+                        }
                     }
                 }
             });
@@ -320,7 +311,7 @@
                     </div>
                     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
                         <h4 class="font-bold text-blue-800">次の一歩</h4>
-                        <p class="mt-1 text-gray-700">${subject.advice[weakestCategory] || '全体的にバランス良く理解できています。素晴らしいです！'}</p>
+                        <p class="mt-1 text-gray-700">${(weakestCategory && subject.advice[weakestCategory]) || '全体的にバランス良く理解できています。素晴らしいです！'}</p>
                     </div>
                 </div>
             `;
@@ -328,7 +319,7 @@
             let actionButtonsHtml = '';
             if (phase === 'basic') {
                 const canAdvance = score >= 70 && state.generatedQuestions.advanced && state.generatedQuestions.advanced.length > 0;
-                const hasIncorrect = results.correct < results.total;
+                const hasIncorrect = state.userAnswers.some(ans => ans && !ans.isCorrect);
                 actionButtonsHtml = `
                     ${hasIncorrect ? `<button class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg" onclick="startQuiz(state.currentSubject, 'rechallenge')">不正解の問題に再挑戦する</button>` : ''}
                     <button class="w-full ${canAdvance ? `bg-${subject.color}-500 hover:bg-${subject.color}-600` : 'bg-gray-400 cursor-not-allowed'} text-white font-bold py-3 px-6 rounded-lg" ${!canAdvance ? 'disabled' : ''} onclick="startQuiz(state.currentSubject, 'advanced')">発展問題に挑戦する</button>
